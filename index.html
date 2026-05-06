@@ -80,7 +80,6 @@
       }
 
       renderIframe();
-      renderQlikEmbed();
       openWebSocket();
     });
 
@@ -135,13 +134,6 @@
       document.querySelector("#iframe").replaceChildren(iframe);
     }
 
-    function renderQlikEmbed() {
-      const qlikEmbed = document.createElement("qlik-embed");
-      qlikEmbed.setAttribute("ui", "object");
-      qlikEmbed.setAttribute("app-id", appSettings.embedAppId);
-      qlikEmbed.setAttribute("object-id", appSettings.embedObjectId);
-      document.querySelector("#qlik-embed-container").replaceChildren(qlikEmbed);
-    }
   </script>
 </head>
 
@@ -149,7 +141,14 @@
   <main>
     <section id="sheet"></section>
     <section id="iframe"></section>
-    <div id="qlik-embed-container" class="viz"></div>
+    <!-- Set app-id and object-id to your Qlik Cloud app and object identifiers. -->
+    <div class="viz">
+      <qlik-embed
+        ui="object"
+        app-id="<EMBED_APP_ID>"
+        object-id="<EMBED_OBJECT_ID>"
+      ></qlik-embed>
+    </div>
   </main>
 </body>
 

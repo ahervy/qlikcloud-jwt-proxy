@@ -129,8 +129,6 @@ Set the Qlik content identifiers in `.env`.
 | `SHEET_ID` | Sheet id used by the Capability API sheet example. |
 | `IFRAME_APP_ID` | Qlik Sense app id used by the Single API iframe example. Defaults to `APP_ID` if omitted. |
 | `IFRAME_SHEET_ID` | Sheet id used by the Single API iframe example. |
-| `EMBED_APP_ID` | Qlik Sense app id used by the `qlik-embed` example. Defaults to `APP_ID` if omitted. |
-| `EMBED_OBJECT_ID` | Object id used by the `qlik-embed` example. |
 | `QLIK_THEME` | Theme used by the examples. Defaults to `breeze`. |
 
 Example:
@@ -140,12 +138,10 @@ APP_ID=e1024b45-efa3-421f-b0c0-44d7d1222c7d
 SHEET_ID=a8bdb8b2-525e-486e-91d1-7318d362acee
 IFRAME_APP_ID=e1024b45-efa3-421f-b0c0-44d7d1222c7d
 IFRAME_SHEET_ID=05743d07-2e17-4c5b-8f81-625c4ee0931b
-EMBED_APP_ID=b1b79fcd-e500-491c-b6e9-2ceaa109214c
-EMBED_OBJECT_ID=ZxDKp
 QLIK_THEME=breeze
 ```
 
-The backend exposes these values to the browser through `/app-config.js`. This keeps tenant-specific app, sheet, and object identifiers out of `index.html`.
+The backend exposes the Capability API and iframe values to the browser through `/app-config.js`. The `qlik-embed` example uses a declarative HTML element — set the `app-id` and `object-id` attributes directly in `index.html`.
 
 ## Start Redis and run the app
 

@@ -305,8 +305,6 @@ function buildFrontendConfig() {
     sheetId: env.SHEET_ID || '<SHEET_ID>',
     iframeAppId: env.IFRAME_APP_ID || env.APP_ID || '<APP_ID>',
     iframeSheetId: env.IFRAME_SHEET_ID || '<SHEET_ID>',
-    embedAppId: env.EMBED_APP_ID || env.APP_ID || '<APP_ID>',
-    embedObjectId: env.EMBED_OBJECT_ID || '<OBJECT_ID>',
     theme: env.QLIK_THEME || 'breeze',
   };
 }
