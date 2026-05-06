@@ -306,7 +306,7 @@ function buildRedisOptions() {
 
   const options = {
     socket: {
-      host: env.redis_db || 'localhost',
+      host: env.REDIS_HOST || 'localhost',
       port: Number(env.redis_port || 6379),
     },
   };

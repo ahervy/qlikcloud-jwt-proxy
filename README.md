@@ -20,7 +20,7 @@ An updated MDX draft for external docs is available in `docs/quickstart-qlik-jwt
 npm install
 ```
 
-6. Start Redis locally, or point `REDIS_URL`/`redis_db`/`redis_port` to a hosted Redis instance.
+6. Start Redis locally, or point `REDIS_URL`/`REDIS_HOST`/`redis_port` to a hosted Redis instance.
 
 ```sh
 docker compose up -d redis
