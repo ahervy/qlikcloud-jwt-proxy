@@ -77,6 +77,7 @@ Set the following values in `.env` using the identity provider application you u
 | `clientSecret` | Client secret for the identity provider application. |
 | `idpUri` | Base URL for the identity provider, without a trailing slash. The sample constructs the authorize endpoint as `{idpUri}/authorize` and the token endpoint as `{idpUri}/oauth/token`. This path convention matches Auth0-style providers. Other identity providers may use different paths and require code changes. |
 | `redirectUri` | Callback URL registered with the identity provider. Defaults to `${APP_BASE_URL}/login/callback` if omitted. |
+| `idpScope` | OAuth scopes requested from the identity provider. Defaults to `openid email profile`. |
 
 ## Configure environment variables
 
