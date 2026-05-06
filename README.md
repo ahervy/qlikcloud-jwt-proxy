@@ -4,7 +4,7 @@ Local Node/Express version of the Qlik Cloud JWT session cookie proxy quickstart
 
 For new production embedded analytics projects, evaluate Qlik OAuth machine-to-machine impersonation first. Keep this JWT session cookie proxy pattern for cases where OAuth impersonation cannot be used and you specifically need the session-cookie proxy architecture.
 
-The quickstart this repo follows is: https://qlik.dev/authenticate/jwt/jwt-proxy/quickstart-qlik-jwt-proxy/
+The quickstart this repo follows is: <https://qlik.dev/authenticate/jwt/jwt-proxy/quickstart-qlik-jwt-proxy/>
 
 An updated MDX draft for external docs is available in `docs/quickstart-qlik-jwt-proxy.mdx`.
 
@@ -20,19 +20,19 @@ An updated MDX draft for external docs is available in `docs/quickstart-qlik-jwt
 npm install
 ```
 
-6. Start Redis locally, or point `REDIS_URL`/`REDIS_HOST`/`redis_port` to a hosted Redis instance.
+1. Start Redis locally, or point `REDIS_URL`/`REDIS_HOST`/`redis_port` to a hosted Redis instance.
 
 ```sh
 docker compose up -d redis
 ```
 
-7. Start the app:
+1. Start the app:
 
 ```sh
 npm start
 ```
 
-8. Open `http://localhost:3000`.
+1. Open `http://localhost:3000`.
 
 ## Important Configuration
 
