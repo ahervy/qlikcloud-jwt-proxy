@@ -217,6 +217,10 @@ app.options('/*', async (req, res) => {
 
 const server = app.listen(port, () => {
   console.log(`Qlik JWT proxy running at ${appBaseUrl}`);
+  console.log(`  Tenant:   ${qlikConfig.tenantUri}`);
+  console.log(`  IdP:      ${authConfig.idpAuthorizeUri}`);
+  console.log(`  Callback: ${authConfig.redirectUri}`);
+  console.log(`  Redis:    ${env.REDIS_URL || `${env.REDIS_HOST || 'localhost'}:${env.redis_port || 6379}`}`);
 });
 
 const wss = new WebSocketServer({ server });
