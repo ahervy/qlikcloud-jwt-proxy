@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const env = process.env;
 
 const port = Number(env.PORT || 3000);
+// frontendUri is a legacy alias for APP_BASE_URL; use APP_BASE_URL in .env.
 const appBaseUrl = removeTrailingSlash(env.APP_BASE_URL || env.frontendUri || `http://localhost:${port}`);
 const qlikWebId = env.webIntegrationId;
 const idpScope = env.idpScope || 'openid email profile';
@@ -39,7 +40,7 @@ const authConfig = {
 
 validateConfig();
 
-// This example maps OAuth state values to PKCE code verifiers during login.
+// Maps PKCE code verifiers to login state values so the callback can complete the authorization code exchange.
 const tokenStore = {};
 
 const redisClient = createClient(buildRedisOptions());
@@ -78,6 +79,10 @@ app.get('/session', (req, res) => {
   res.json({ authenticated: Boolean(req.session?.qlikSession) });
 });
 
+// Login uses two passes:
+// 1. prompt=none — attempts silent SSO (no user interaction).
+// 2. If the IdP returns login_required or interaction_required, the callback
+//    redirects again without prompt=none so the user sees the login page.
 app.get('/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
   const codeVerifier = generators.codeVerifier(43);
@@ -141,6 +146,7 @@ app.get('/login/callback', async (req, res) => {
     const qlikSession = await getQlikSessionCookie(qlikConfig.tenantUri, qlikJwt);
 
     req.session.idToken = idpToken.id_token;
+    // Encode the Qlik cookie string so it survives JSON serialization in the session store.
     req.session.qlikSession = encodeURIComponent(qlikSession);
 
     res.redirect(appBaseUrl);
@@ -236,6 +242,8 @@ wss.on('connection', async (ws, req) => {
       return;
     }
 
+    // The upstream Qlik websocket may not be open when the first browser message arrives.
+    // openPromise defers forwarding until the upstream connection is established.
     let isOpened = false;
     const qlikWebSocket = new WebSocket(`wss://${qlikConfig.tenantUri}/app/${appId}?qlik-csrf-token=${csrfToken}`, {
       headers: {
@@ -344,7 +352,7 @@ function createToken(email, name, sub, config) {
 
   const payload = {
     jti: crypto.randomBytes(16).toString('hex'),
-    sub: `BackendApp|${sub}`,
+    sub: `BackendApp|${sub}`, // Prefix the IdP subject to form a stable Qlik user identity.
     subType: 'user',
     email_verified: true,
     email,
@@ -376,6 +384,8 @@ async function getQlikSessionCookie(tenantUri, token) {
     .join(';');
 }
 
+// Node 18.14+ exposes headers.getSetCookie(), which returns each Set-Cookie header as a separate string.
+// Older Node versions combine them into one header string that must be split manually.
 function getSetCookieHeaders(headers) {
   if (typeof headers.getSetCookie === 'function') {
     return headers.getSetCookie();
@@ -385,6 +395,7 @@ function getSetCookieHeaders(headers) {
 }
 
 function splitCombinedSetCookieHeader(value) {
+  // Split on commas that are followed by a cookie name= token, not by cookie attributes like Max-Age.
   return value ? value.split(/,(?=\s*[^;,]+=)/) : [];
 }
 
@@ -444,6 +455,7 @@ function normalizePrivateKey(value) {
   return value?.replaceAll('\\n', '\n');
 }
 
+// Accept either a bare hostname or a full URL; the proxy always constructs https:// URLs internally.
 function normalizeTenantHost(value) {
   return removeTrailingSlash(value || '').replace(/^https?:\/\//, '');
 }
