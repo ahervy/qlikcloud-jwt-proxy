@@ -27,73 +27,39 @@ Before you begin, you need:
 - A Qlik Sense app in a shared or managed space that your users can access.
 - A web integration id in Qlik Cloud that allows your web application origin, for example `http://localhost:3000`.
 - Node.js 18 or newer.
-- Redis-compatible session storage. Use local Redis for development and a managed Redis-compatible service for deployed multi-instance environments.
+- Docker, for the local Redis service. If you prefer not to use Docker, set `REDIS_URL` to point to an existing Redis-compatible instance.
 - Familiarity with Node.js applications that use Express.
 - An identity provider application for authenticating users to your web application. This sample uses an Auth0-style authorization code flow with PKCE.
 
-## Happy path
+## Clone and install
 
-Clone the sample repository and run it locally:
+Clone the sample repository and install dependencies:
 
 ```sh
 git clone https://github.com/goldbergjeffrey/qlikcloud-jwt-proxy.git
 cd qlikcloud-jwt-proxy
 npm install
+```
+
+Copy the example environment file:
+
+```sh
 cp .env.example .env
-```
-
-Start a local Redis service:
-
-```sh
-docker compose up -d redis
-```
-
-Fill in `.env`, then start the application:
-
-```sh
-npm start
-```
-
-Open `http://localhost:3000`.
-
-## 1.0.0 Install dependencies
-
-Install the Node.js dependencies:
-
-```sh
-npm install
 ```
 
 The sample includes `dotenv`, so environment variables in `.env` are loaded automatically when the app starts.
 
-## 2.0.0 Configuration
+## Configure Qlik Cloud
 
-The app is configured with environment variables. Copy `.env.example` to `.env` and update the values for your tenant, identity provider, Redis-compatible session store, and Qlik content.
-
-### 2.1.0 Configure backend environment variables
-
-Set the following values in `.env`.
+Set the following values in `.env` using the JWT identity provider configuration and web integration id from your Qlik Cloud tenant.
 
 | Variable | Description |
 | --- | --- |
-| `PORT` | Local port for the Node.js application. Defaults to `3000`. |
-| `APP_BASE_URL` | Public URL for this proxy, such as `http://localhost:3000`. If you use a tunnel or reverse proxy, set this to that URL. |
-| `clientId` | Client id for the identity provider application used to authenticate users to your web app. |
-| `clientSecret` | Client secret for the identity provider application. |
-| `idpUri` | Base URL for the identity provider, without a trailing slash. |
-| `redirectUri` | Callback URL registered with the identity provider. Defaults to `${APP_BASE_URL}/login/callback` if omitted. |
 | `tenantUri` | Hostname for your Qlik Cloud tenant, for example `tenant.region.qlikcloud.com`. |
 | `webIntegrationId` | Web integration id configured in Qlik Cloud for iframe embedding and allowed origins. |
 | `issuer` | Issuer value from the Qlik Cloud JWT identity provider configuration. |
 | `keyId` | Key id from the Qlik Cloud JWT identity provider configuration. |
 | `privateKey` | Private key used by the web application to sign JWTs for Qlik Cloud. |
-| `sessionSecret` | Long random string used to sign the web application session cookie. |
-| `REDIS_URL` | Optional Redis connection URL. If set, this takes precedence over `redis_db`, `redis_port`, and `redis_pwd`. |
-| `redis_db` | Redis host for local or managed Redis-compatible session storage. |
-| `redis_port` | Redis port. |
-| `redis_pwd` | Optional Redis password. |
-| `SESSION_MAX_AGE_MS` | Session lifetime in milliseconds. Defaults to ten minutes. |
-| `COOKIE_SECURE` | Set to `true` when the app is served over HTTPS. |
 
 The private key can be stored with escaped newlines:
 
@@ -101,19 +67,58 @@ The private key can be stored with escaped newlines:
 privateKey="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-For local development with the included Docker Compose file, use:
+## Configure the identity provider
+
+Set the following values in `.env` using the identity provider application you use to authenticate users to your web app.
+
+| Variable | Description |
+| --- | --- |
+| `clientId` | Client id for the identity provider application. |
+| `clientSecret` | Client secret for the identity provider application. |
+| `idpUri` | Base URL for the identity provider, without a trailing slash. The sample constructs the authorize endpoint as `{idpUri}/authorize` and the token endpoint as `{idpUri}/oauth/token`. This path convention matches Auth0-style providers. Other identity providers may use different paths and require code changes. |
+| `redirectUri` | Callback URL registered with the identity provider. Defaults to `${APP_BASE_URL}/login/callback` if omitted. |
+
+## Configure environment variables
+
+Set the remaining values in `.env`.
+
+### Session and app settings
+
+| Variable | Description |
+| --- | --- |
+| `PORT` | Local port for the Node.js application. Defaults to `3000`. |
+| `APP_BASE_URL` | Public URL for this proxy, such as `http://localhost:3000`. If you use a tunnel or reverse proxy, set this to that URL. |
+| `sessionSecret` | Long random string used to sign the web application session cookie. |
+| `SESSION_MAX_AGE_MS` | Session lifetime in milliseconds. Defaults to ten minutes. |
+| `COOKIE_SECURE` | Set to `true` when the app is served over HTTPS. |
+
+Generate a secure value for `sessionSecret` with:
+
+```sh
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### Redis session storage
+
+| Variable | Description |
+| --- | --- |
+| `REDIS_URL` | Optional Redis connection URL. If set, this takes precedence over `REDIS_HOST`, `redis_port`, and `redis_pwd`. |
+| `REDIS_HOST` | Redis host. Defaults to `localhost`. |
+| `redis_port` | Redis port. Defaults to `6379`. |
+| `redis_pwd` | Optional Redis password. |
+
+For local development with the included Docker Compose file, the defaults work without changes:
 
 ```env
-redis_db=localhost
+REDIS_HOST=localhost
 redis_port=6379
-# redis_pwd=
 ```
 
 For deployed environments, use a managed Redis-compatible service and configure authentication and TLS according to your provider.
 
-### 2.2.0 Configure frontend content
+### Demo content
 
-The frontend no longer requires hardcoded web application hostnames in `index.html`. It uses same-origin URLs such as `/resources`, `/single`, `/app-config.js`, and `/session`, so it works locally at `http://localhost:3000` and can also work behind a public HTTPS URL when `APP_BASE_URL` is configured.
+The frontend uses same-origin URLs such as `/resources`, `/single`, `/app-config.js`, and `/session`, so it works locally at `http://localhost:3000` and behind a public HTTPS URL when `APP_BASE_URL` is configured.
 
 Set the Qlik content identifiers in `.env`.
 
@@ -141,9 +146,9 @@ QLIK_THEME=breeze
 
 The backend exposes these values to the browser through `/app-config.js`. This keeps tenant-specific app, sheet, and object identifiers out of `index.html`.
 
-## 3.0.0 Run the web application
+## Start Redis and run the app
 
-Start Redis:
+Start a local Redis service using Docker Compose:
 
 ```sh
 docker compose up -d redis
@@ -155,21 +160,35 @@ Start the Node.js app:
 npm start
 ```
 
+The startup output confirms the resolved configuration:
+
+```
+Qlik JWT proxy running at http://localhost:3000
+  Tenant:   your-tenant.region.qlikcloud.com
+  IdP:      https://your-idp-domain.example.com/authorize
+  Callback: http://localhost:3000/login/callback
+  Redis:    localhost:6379
+```
+
+If any required value is missing or wrong, compare `.env` against `.env.example` before proceeding.
+
+## Test the login flow
+
 Open the local application:
 
 ```text
 http://localhost:3000
 ```
 
-If the browser does not have an active application session, the frontend calls `/session`, receives `authenticated: false`, and redirects the user to `/login`. After the identity provider completes authentication, the app exchanges the user claims for a Qlik Cloud session cookie and redirects the browser back to `APP_BASE_URL`.
+The frontend calls `/session` on load. If there is no active session, it redirects to `/login`. After the identity provider completes authentication, the app exchanges the user claims for a Qlik Cloud session cookie and redirects back to `APP_BASE_URL`.
 
-After login, the page renders Qlik content through:
+After a successful login, the page renders Qlik content through:
 
 - A Capability API sheet example.
 - A Single API iframe example through `/single`.
 - A `qlik-embed` object example.
 
-## 4.0.0 How the proxy works
+## How the proxy works
 
 The backend handles the sensitive parts of the flow:
 
@@ -183,9 +202,9 @@ The backend handles the sensitive parts of the flow:
 
 The browser receives only the first-party web application session cookie. The Qlik Cloud session cookie stays in backend session storage.
 
-## 5.0.0 Session storage guidance
+## Session storage
 
-Redis-compatible session storage is required for the sample architecture because the backend must retrieve the Qlik session cookie for HTTP proxy routes and websocket connections.
+Redis-compatible session storage is required for this architecture because the backend must retrieve the Qlik session cookie for HTTP proxy routes and websocket connections.
 
 Use these defaults:
 
@@ -193,9 +212,7 @@ Use these defaults:
 - Single local experiment: an in-memory session store can be used only for throwaway testing, but it is not recommended for this quickstart.
 - Deployed environments: managed Redis-compatible storage with authentication, TLS, backups, monitoring, and a clear session expiration policy.
 
-Do not describe cloud Redis as mandatory for local development. It is a deployment option, not a prerequisite for running the sample locally.
-
-## 6.0.0 Troubleshooting
+## Troubleshooting
 
 ### Missing environment variables
 
@@ -222,7 +239,7 @@ Check that:
 
 The websocket proxy reads the signed `connect.sid` cookie and loads the matching session from Redis. If the session expired, Redis restarted, or the browser has no valid app session, sign in again.
 
-## 7.0.0 Production considerations
+## Production considerations
 
 Before using this pattern outside a sample or proof of concept:
 
