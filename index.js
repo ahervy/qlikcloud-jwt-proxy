@@ -151,43 +151,53 @@ app.get('/login/callback', async (req, res) => {
 });
 
 app.get('/single/*', async (req, res) => {
-  const qlikCookie = getQlikCookieFromSession(req.session);
-  if (!qlikCookie) {
-    sendNoSession(res);
-    return;
+  try {
+    const qlikCookie = getQlikCookieFromSession(req.session);
+    if (!qlikCookie) {
+      sendNoSession(res);
+      return;
+    }
+
+    const csrfToken = getCsrfToken(qlikCookie);
+    if (!csrfToken) {
+      res.status(401).send('Qlik session is missing a CSRF token.');
+      return;
+    }
+
+    const upstreamUrl = buildQlikUrl(req.originalUrl, {
+      'qlik-csrf-token': csrfToken,
+      'qlik-web-integration-id': qlikWebId,
+    });
+
+    const upstream = await fetch(upstreamUrl, {
+      headers: {
+        cookie: qlikCookie,
+      },
+    });
+
+    setCors(res);
+    res.set('content-type', upstream.headers.get('content-type') || 'text/html; charset=UTF-8');
+    res.status(upstream.status);
+    res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
+  } catch (err) {
+    console.error('Proxy /single failed:', err.message);
+    res.status(502).send('Failed to load content from Qlik Cloud. Check that tenantUri is correct and reachable.');
   }
-
-  const csrfToken = getCsrfToken(qlikCookie);
-  if (!csrfToken) {
-    res.status(401).send('Qlik session is missing a CSRF token.');
-    return;
-  }
-
-  const upstreamUrl = buildQlikUrl(req.originalUrl, {
-    'qlik-csrf-token': csrfToken,
-    'qlik-web-integration-id': qlikWebId,
-  });
-
-  const upstream = await fetch(upstreamUrl, {
-    headers: {
-      cookie: qlikCookie,
-    },
-  });
-
-  setCors(res);
-  res.set('content-type', upstream.headers.get('content-type') || 'text/html; charset=UTF-8');
-  res.status(upstream.status);
-  res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
 });
 
 app.get('/api/v1/*', async (req, res) => {
-  const qlikCookie = getQlikCookieFromSession(req.session);
-  const headers = qlikCookie ? { cookie: qlikCookie } : {};
-  const upstream = await fetch(`https://${qlikConfig.tenantUri}${req.originalUrl}`, { headers });
+  try {
+    const qlikCookie = getQlikCookieFromSession(req.session);
+    const headers = qlikCookie ? { cookie: qlikCookie } : {};
+    const upstream = await fetch(`https://${qlikConfig.tenantUri}${req.originalUrl}`, { headers });
 
-  setCors(res);
-  res.status(upstream.status);
-  res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
+    setCors(res);
+    res.status(upstream.status);
+    res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
+  } catch (err) {
+    console.error('Proxy /api/v1 failed:', err.message);
+    res.status(502).send('Failed to reach Qlik Cloud API. Check that tenantUri is correct and reachable.');
+  }
 });
 
 app.get('/resources/*', async (req, res) => {
