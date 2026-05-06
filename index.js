@@ -96,7 +96,9 @@ app.get('/login/callback', async (req, res) => {
   try {
     const { code, error, state } = req.query;
 
-    if (error === 'login_required' || error === 'interaction_required') {
+    // Any error from a prompt=none attempt means we need interactive login.
+    // Common values: login_required, interaction_required, consent_required.
+    if (error) {
       const state2 = crypto.randomBytes(16).toString('hex');
       const codeVerifier = generators.codeVerifier(43);
       const codeChallenge = generators.codeChallenge(codeVerifier);
@@ -108,6 +110,11 @@ app.get('/login/callback', async (req, res) => {
 
     if (!state || !tokenStore[state]) {
       res.status(401).send('Invalid or expired login state.');
+      return;
+    }
+
+    if (!code) {
+      res.status(400).send('Missing authorization code from identity provider.');
       return;
     }
 
@@ -207,13 +214,31 @@ app.get('/api/v1/*', async (req, res) => {
 });
 
 app.get('/resources/*', async (req, res) => {
-  setCors(res);
-  res.redirect(`https://${qlikConfig.tenantUri}${req.originalUrl}`);
+  try {
+    const upstream = await fetch(`https://${qlikConfig.tenantUri}${req.originalUrl}`);
+    setCors(res);
+    res.status(upstream.status);
+    res.set('Content-Type', upstream.headers.get('content-type'));
+    res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
+  } catch (err) {
+    console.error('Proxy /resources failed:', err.message);
+    setCors(res);
+    res.status(502).send('Failed to reach Qlik Cloud resources.');
+  }
 });
 
 app.get('/assets/*', async (req, res) => {
-  setCors(res);
-  res.redirect(`https://${qlikConfig.tenantUri}${req.originalUrl}`);
+  try {
+    const upstream = await fetch(`https://${qlikConfig.tenantUri}${req.originalUrl}`);
+    setCors(res);
+    res.status(upstream.status);
+    res.set('Content-Type', upstream.headers.get('content-type'));
+    res.end(Buffer.from(await upstream.arrayBuffer()), 'binary');
+  } catch (err) {
+    console.error('Proxy /assets failed:', err.message);
+    setCors(res);
+    res.status(502).send('Failed to reach Qlik Cloud assets.');
+  }
 });
 
 app.options('/*', async (req, res) => {
