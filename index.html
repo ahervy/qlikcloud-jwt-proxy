@@ -60,7 +60,7 @@
   <script defer>
     const appSettings = window.__APP_CONFIG__;
     const config = {
-      host: window.location.host,
+      host: window.location.hostname,
       port: Number(window.location.port || (window.location.protocol === "https:" ? 443 : 80)),
       prefix: "/",
       isSecure: window.location.protocol === "https:",
