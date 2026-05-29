@@ -283,17 +283,19 @@ function startLogin(res, prompt) {
 async function exchangeAuthorizationCode(code, state, codeVerifier) {
   // The authorization code is useless without the matching PKCE verifier, which
   // protects the callback from intercepted or replayed codes.
+  const tokenRequestBody = new URLSearchParams({
+    code,
+    code_verifier: codeVerifier,
+    grant_type: 'authorization_code',
+    redirect_uri: authConfig.redirectUri,
+    client_id: authConfig.clientId,
+    client_secret: authConfig.clientSecret,
+  });
+
   const idpTokenRes = await fetch(authConfig.idpTokenUri, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code,
-      code_verifier: codeVerifier,
-      grant_type: 'authorization_code',
-      redirect_uri: authConfig.redirectUri,
-      client_id: authConfig.clientId,
-      client_secret: authConfig.clientSecret,
-    }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: tokenRequestBody,
   });
 
   delete tokenStore[state];
