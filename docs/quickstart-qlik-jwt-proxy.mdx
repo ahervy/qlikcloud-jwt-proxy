@@ -19,6 +19,8 @@ The sample application demonstrates:
 
 The approach works with any suitable backend framework. This quickstart uses Node.js, Express, Redis-compatible session storage, and JavaScript.
 
+This sample focuses on the Qlik JWT proxy flow. It simplifies IdP token validation for tutorial purposes and must not be used as production authentication logic without proper token validation, issuer/audience checks, expiry checks, nonce handling, and other hardening.
+
 ## Prerequisites
 
 Before you begin, you need:
@@ -36,10 +38,12 @@ Before you begin, you need:
 Clone the sample repository and install dependencies:
 
 ```sh
-git clone https://github.com/goldbergjeffrey/qlikcloud-jwt-proxy.git
+git clone https://github.com/YOUR_ORG/qlikcloud-jwt-proxy.git
 cd qlikcloud-jwt-proxy
 npm install
 ```
+
+Before publishing this tutorial, replace `https://github.com/YOUR_ORG/qlikcloud-jwt-proxy.git` with the final public repository URL.
 
 Copy the example environment file:
 

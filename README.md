@@ -4,9 +4,9 @@ Local Node/Express version of the Qlik Cloud JWT session cookie proxy quickstart
 
 For new production embedded analytics projects, evaluate Qlik OAuth machine-to-machine impersonation first. Keep this JWT session cookie proxy pattern for cases where OAuth impersonation cannot be used and you specifically need the session-cookie proxy architecture.
 
-The quickstart this repo follows is: <https://qlik.dev/authenticate/jwt/jwt-proxy/quickstart-qlik-jwt-proxy/>
+This sample focuses on the Qlik JWT proxy flow. It simplifies IdP token validation for tutorial purposes and must not be used as production authentication logic without proper token validation, issuer/audience checks, expiry checks, nonce handling, and other hardening.
 
-An updated MDX draft for external docs is available in `docs/quickstart-qlik-jwt-proxy.mdx`.
+Before publishing, replace any placeholder clone URL in `docs/quickstart-qlik-jwt-proxy.mdx` with the final public repository URL.
 
 ## Run Locally
 
@@ -34,6 +34,17 @@ npm start
 
 1. Open `http://localhost:3000`.
 
+## Required Environment Variables
+
+Copy `.env.example` to `.env`, then set these values before running the tutorial:
+
+| Area | Variables |
+| --- | --- |
+| Startup | `tenantUri`, `webIntegrationId`, `issuer`, `keyId`, `privateKey`, `clientId`, `clientSecret`, `idpUri`, `sessionSecret` |
+| Local URL | `APP_BASE_URL`, and `redirectUri` if your IdP requires an exact callback value |
+| Redis | Use the local defaults, or set `REDIS_URL` for a hosted Redis-compatible instance |
+| Demo content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_THEME` |
+
 ## Important Configuration
 
 `APP_BASE_URL` is the public URL of this proxy. For local development it is usually `http://localhost:3000`. If you use a tunnel or HTTPS reverse proxy, set this value to that URL and update the IdP callback URL.
@@ -46,7 +57,7 @@ npm start
 privateKey="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-The demo content is configured through `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `EMBED_APP_ID`, and `EMBED_OBJECT_ID`.
+The Capability API and Single API iframe examples use the demo content variables in `.env`. The `qlik-embed` example is intentionally simpler for this tutorial: edit the `app-id` and `object-id` attributes directly in `index.html`.
 
 ## Scripts
 
