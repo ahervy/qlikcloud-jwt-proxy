@@ -19,25 +19,25 @@ const env = process.env;
 
 // Configuration
 const port = Number(env.PORT || 3000);
-const appBaseUrl = removeTrailingSlash(env.APP_BASE_URL || env.frontendUri || `http://localhost:${port}`);
-const qlikWebId = env.webIntegrationId;
-const idpScope = env.idpScope || 'openid email profile';
+const appBaseUrl = removeTrailingSlash(env.APP_BASE_URL || `http://localhost:${port}`);
+const qlikWebId = env.WEB_INTEGRATION_ID;
+const idpScope = env.IDP_SCOPE || 'openid email profile';
 
 // Qlik tenant and JWT identity-provider settings. tenantUri accepts either a
 // bare host or URL so the rest of the app can always build https:// URLs.
 const qlikConfig = {
-  tenantUri: normalizeTenantHost(env.tenantUri),
-  privateKey: env.privateKey?.replaceAll('\\n', '\n'),
-  keyId: env.keyId,
-  issuer: env.issuer,
+  tenantUri: normalizeTenantHost(env.TENANT_URI),
+  privateKey: env.QLIK_JWT_PRIVATE_KEY?.replaceAll('\\n', '\n'),
+  keyId: env.QLIK_JWT_KEY_ID,
+  issuer: env.QLIK_JWT_ISSUER,
 };
 
 const authConfig = {
-  clientId: env.clientId,
-  clientSecret: env.clientSecret,
-  redirectUri: env.redirectUri || `${appBaseUrl}/login/callback`,
-  idpAuthorizeUri: `${removeTrailingSlash(env.idpUri || '')}/authorize`,
-  idpTokenUri: `${removeTrailingSlash(env.idpUri || '')}/oauth/token`,
+  clientId: env.IDP_CLIENT_ID,
+  clientSecret: env.IDP_CLIENT_SECRET,
+  redirectUri: env.IDP_REDIRECT_URI || `${appBaseUrl}/login/callback`,
+  idpAuthorizeUri: `${removeTrailingSlash(env.IDP_URI || '')}/authorize`,
+  idpTokenUri: `${removeTrailingSlash(env.IDP_URI || '')}/oauth/token`,
 };
 
 validateConfig();
@@ -59,7 +59,7 @@ const app = express();
 app.use(compression({ threshold: 0 }));
 app.use(session({
   store,
-  secret: env.sessionSecret,
+  secret: env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -208,7 +208,7 @@ const server = app.listen(port, () => {
   console.log(`  Tenant:   ${qlikConfig.tenantUri}`);
   console.log(`  IdP:      ${authConfig.idpAuthorizeUri}`);
   console.log(`  Callback: ${authConfig.redirectUri}`);
-  console.log(`  Redis:    ${env.REDIS_URL || `${env.REDIS_HOST || 'localhost'}:${env.redis_port || 6379}`}`);
+  console.log(`  Redis:    ${env.REDIS_URL || `${env.REDIS_HOST || 'localhost'}:${env.REDIS_PORT || 6379}`}`);
 });
 
 // Qlik Websocket Proxy
@@ -439,12 +439,12 @@ function buildRedisOptions() {
   const options = {
     socket: {
       host: env.REDIS_HOST || 'localhost',
-      port: Number(env.redis_port || 6379),
+      port: Number(env.REDIS_PORT || 6379),
     },
   };
 
-  if (env.redis_pwd) {
-    options.password = env.redis_pwd;
+  if (env.REDIS_PASSWORD) {
+    options.password = env.REDIS_PASSWORD;
   }
 
   return options;
@@ -469,10 +469,10 @@ function validateConfig() {
     keyId: qlikConfig.keyId,
     issuer: qlikConfig.issuer,
     webIntegrationId: qlikWebId,
-    sessionSecret: env.sessionSecret,
+    sessionSecret: env.SESSION_SECRET,
     clientId: authConfig.clientId,
     clientSecret: authConfig.clientSecret,
-    idpUri: env.idpUri,
+    idpUri: env.IDP_URI,
   }).filter(([, value]) => !value).map(([key]) => key);
 
   if (missing.length) {
