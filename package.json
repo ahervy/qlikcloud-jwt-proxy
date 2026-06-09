@@ -1,29 +1,28 @@
 {
-  "name": "nodejs",
+  "name": "qlikcloud-jwt-proxy",
   "version": "1.0.0",
   "type": "module",
-  "description": "",
+  "description": "Local Node/Express JWT session cookie proxy for embedding Qlik Cloud content.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "check": "node --check index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/cookie-parser": "^1.4.3",
-    "@types/node": "^18.0.6",
-    "compression": "^1.7.4",
+    "compression": "^1.8.1",
     "connect-redis": "^7.1.0",
-    "cookie": "^0.5.0",
-    "cookie-parser": "^1.4.6",
-    "express": "^4.18.2",
-    "express-compression": "^1.0.2",
-    "express-session": "^1.17.3",
+    "cookie": "^1.1.1",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.1",
+    "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.0",
-    "node-fetch": "^3.2.6",
     "openid-client": "^5.4.2",
     "redis": "^4.6.7",
-    "ws": "^8.13.0"
+    "ws": "^8.20.0"
   }
 }
