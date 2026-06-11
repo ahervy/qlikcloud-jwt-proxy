@@ -15,7 +15,7 @@ Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cook
   - Client ID and client secret
   - Authorization endpoint: `{IDP_URI}/authorize`
   - Token endpoint: `{IDP_URI}/oauth/token`
-  - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
+  - Callback URL set to `http://localhost:3000/oauth-callback.html` (adjust for your setup)
 - Redis running locally or access to a Redis-compatible instance
 
 ### Setup
@@ -92,7 +92,7 @@ This sample constructs IdP endpoints using the `IDP_URI` base URL:
 
 This pattern matches Auth0 and similar OAuth2 providers. **If your IdP uses different endpoint paths, you must modify `index.js`** to construct the correct URLs (see lines 39–40).
 
-Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/login/callback`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
+Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/oauth-callback.html`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
 
 ### Other Configuration Notes
 
