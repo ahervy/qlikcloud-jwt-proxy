@@ -79,6 +79,13 @@
         return;
       }
 
+      // Configure qlik-embed object from app config
+      const qlikEmbedElement = document.querySelector("#qlik-embed-object");
+      if (qlikEmbedElement && appSettings.qlikEmbedAppId && appSettings.qlikEmbedObjectId) {
+        qlikEmbedElement.setAttribute("app-id", appSettings.qlikEmbedAppId);
+        qlikEmbedElement.setAttribute("object-id", appSettings.qlikEmbedObjectId);
+      }
+
       renderIframe();
       openWebSocket();
     });
@@ -141,13 +148,8 @@
   <main>
     <section id="sheet"></section>
     <section id="iframe"></section>
-    <!-- Set app-id and object-id to your Qlik Cloud app and object identifiers. -->
     <div class="viz">
-      <qlik-embed
-        ui="object"
-        app-id="<APP_ID>"
-        object-id="<OBJECT_ID>"
-      ></qlik-embed>
+      <qlik-embed id="qlik-embed-object" ui="object"></qlik-embed>
     </div>
   </main>
 </body>
