@@ -1,74 +1,135 @@
 # Qlik Cloud JWT Proxy
 
-Local Node/Express version of the Qlik Cloud JWT session cookie proxy quickstart. The app keeps the tutorial scope: authenticate a user through a web app IdP, create a signed JWT for Qlik Cloud, store the Qlik session cookie server-side, and proxy Qlik Cloud resources, REST calls, Single API iframe content, and engine websockets from a same-origin local app.
+Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cookie proxy pattern. This app authenticates a user through an identity provider (IdP), creates a signed JWT for Qlik Cloud, stores the Qlik session cookie server-side, and proxies Qlik Cloud resources, REST API calls, Single API iframe content, and engine websockets from the same origin.
 
-For new production embedded analytics projects, evaluate Qlik OAuth machine-to-machine impersonation first. Keep this JWT session cookie proxy pattern for cases where OAuth impersonation cannot be used and you specifically need the session-cookie proxy architecture.
-
-This sample focuses on the Qlik JWT proxy flow. It simplifies IdP token validation for tutorial purposes and must not be used as production authentication logic without proper token validation, issuer/audience checks, expiry checks, nonce handling, and other hardening.
-
-Before publishing, replace any placeholder clone URL in `docs/quickstart-qlik-jwt-proxy.mdx` with the final public repository URL.
+**This is a tutorial sample, not production-ready authentication infrastructure.** It intentionally simplifies IdP token validation and session management for educational purposes. For production use, implement proper token validation, issuer/audience checks, expiry validation, nonce handling, and other security hardening.
 
 ## Run Locally
 
-1. Install Node.js 18 or newer.
-2. Create a Qlik Cloud JWT identity provider configuration and web integration id.
-3. Create or configure your web application identity provider client. Its callback URL must match `redirectUri`.
-4. Copy `.env.example` to `.env` and fill in the values.
-5. Install dependencies:
+### Prerequisites
+
+- Node.js 18 or newer
+- Qlik Cloud tenant with JWT identity provider configuration (get the tenant URI, key ID, and private key from your Qlik admin)
+- Web integration ID from Qlik Cloud
+- Identity provider (IdP) set up as an OAuth2 application with:
+  - Client ID and client secret
+  - Authorization endpoint: `{IDP_URI}/authorize`
+  - Token endpoint: `{IDP_URI}/oauth/token`
+  - Callback URL set to `http://localhost:3000/oauth-callback.html` (adjust for your setup)
+- Redis running locally or access to a Redis-compatible instance
+
+### Setup
+
+1. Clone this repository.
+2. Install dependencies:
 
 ```sh
 npm install
 ```
 
-1. Start Redis locally, or point `REDIS_URL`/`REDIS_HOST`/`redis_port` to a hosted Redis instance.
+3. Copy `.env.example` to `.env` and fill in all required values (see [Required Environment Variables](#required-environment-variables) below).
+
+4. Start Redis locally:
 
 ```sh
 docker compose up -d redis
 ```
 
-1. Start the app:
+Or point to a hosted Redis instance by setting `REDIS_URL` in `.env`.
+
+5. Start the app:
 
 ```sh
 npm start
 ```
 
-1. Open `http://localhost:3000`.
+6. Open `http://localhost:3000` in your browser, complete the IdP login, and verify that Qlik content loads.
 
 ## Required Environment Variables
 
-Copy `.env.example` to `.env`, then set these values before running the tutorial:
+Copy `.env.example` to `.env`, then set these values before running the sample:
 
-| Area | Variables |
-| --- | --- |
-| Startup | `tenantUri`, `webIntegrationId`, `issuer`, `keyId`, `privateKey`, `clientId`, `clientSecret`, `idpUri`, `sessionSecret` |
-| Local URL | `APP_BASE_URL`, and `redirectUri` if your IdP requires an exact callback value |
-| Redis | Use the local defaults, or set `REDIS_URL` for a hosted Redis-compatible instance |
-| Demo content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_THEME` |
+| Category | Variables | Purpose |
+| --- | --- | --- |
+| Qlik Cloud | `TENANT_URI`, `WEB_INTEGRATION_ID`, `QLIK_JWT_ISSUER`, `QLIK_JWT_KEY_ID`, `QLIK_JWT_PRIVATE_KEY` | JWT identity provider configuration from Qlik Cloud |
+| Identity Provider | `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`, `IDP_URI`, `IDP_REDIRECT_URI` | OAuth2 configuration for your IdP (e.g., Auth0) |
+| Session | `SESSION_SECRET`, `SESSION_MAX_AGE_MS` | Session management |
+| Local App | `APP_BASE_URL` | Public URL of this proxy (usually `http://localhost:3000` for local development) |
+| Redis | `REDIS_HOST`, `REDIS_PORT` or `REDIS_URL` | Session storage (see [Redis Configuration](#redis-configuration)) |
+| Cookies | `COOKIE_SECURE` | Set to `true` if using HTTPS |
+| Demo Content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_THEME` | Qlik app and sheet IDs to display in the sample (optional) |
 
-## Important Configuration
+### Redis Configuration
 
-`APP_BASE_URL` is the public URL of this proxy. For local development it is usually `http://localhost:3000`. If you use a tunnel or HTTPS reverse proxy, set this value to that URL and update the IdP callback URL.
+The app uses Redis to store Qlik session cookies server-side. Choose one of these approaches:
 
-`redirectUri` defaults to `${APP_BASE_URL}/login/callback`, but it is listed in `.env.example` because most IdPs require an exact allow-list value.
+**Option 1: Local Redis (Docker Compose)**
 
-`privateKey` can be stored with escaped newlines, for example:
+The default `.env.example` uses `REDIS_HOST=localhost` and `REDIS_PORT=6379`. Start Redis with:
 
-```env
-privateKey="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```sh
+docker compose up -d redis
 ```
 
-The Capability API and Single API iframe examples use the demo content variables in `.env`. The `qlik-embed` example is intentionally simpler for this tutorial: edit the `app-id` and `object-id` attributes directly in `index.html`.
+**Option 2: Hosted Redis**
+
+Set `REDIS_URL` in `.env` (e.g., `******host:port`). Leave `REDIS_HOST` and `REDIS_PORT` commented out:
+
+```env
+REDIS_URL=redis://localhost:6379
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
+```
+
+The app supports `REDIS_PASSWORD` if your Redis instance requires authentication.
+
+### Identity Provider (IdP) Configuration
+
+This sample constructs IdP endpoints using the `IDP_URI` base URL:
+
+- **Authorization endpoint**: `{IDP_URI}/authorize`
+- **Token endpoint**: `{IDP_URI}/oauth/token`
+
+This pattern matches Auth0 and similar OAuth2 providers. **If your IdP uses different endpoint paths, you must modify `index.js`** to construct the correct URLs (see lines 39–40).
+
+Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/oauth-callback.html`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
+
+### Other Configuration Notes
+
+- **`APP_BASE_URL`**: The public URL of this proxy. For local development, it defaults to `http://localhost:3000`. If you expose the app via a tunnel or reverse proxy, set this to that URL and update your IdP callback configuration.
+
+- **`privateKey`**: Store the Qlik JWT private key with escaped newlines:
+
+```env
+QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+- **Demo content**: The sample displays Qlik content using environment variables. The `qlik-embed` example in `index.html` is simpler: edit the `app-id` and `object-id` attributes directly in the HTML file instead of using environment variables.
 
 ## Scripts
 
 ```sh
-npm start
-npm run dev
-npm run check
+npm start          # Run the app
+npm run dev        # Run with auto-reload (requires a dev tool configured)
+npm run check      # Run linting and type checks
 ```
 
-## Notes
+## How It Works
 
-The browser only receives the local session cookie. The Qlik session cookie is stored in Redis and attached by the backend when proxying requests to Qlik Cloud.
+- **Session storage**: The browser receives a local session cookie (Express session). The Qlik session cookie is stored server-side in Redis and attached to requests when proxying to Qlik Cloud. This pattern protects the Qlik session from frontend access.
 
-Use local Redis for development. Use a managed Redis-compatible service for deployed multi-instance environments. The default in-memory session store from `express-session` is only suitable for short local experiments because sessions vanish on restart and it is not designed for production.
+- **Redis for multi-instance deployment**: In development, you can use local Redis. For production deployments with multiple app instances, use a managed Redis service so all instances share the same session store.
+
+- **IdP integration**: The app uses PKCE (Proof Key for Code Exchange) to securely exchange an authorization code for an IdP token, then uses that token to identify the user. A Qlik JWT is created from the user's IdP claims and exchanged for a Qlik session cookie.
+
+- **Proxying**: The app proxies Qlik API requests (`/api/v1/*`), Single API content (`/single/*`), static assets (`/resources/*`, `/assets/*`), and websocket connections (`/app/*`) through the same origin, maintaining session context.
+
+## Troubleshooting
+
+- **Redis connection errors**: Ensure Redis is running. Check that `REDIS_HOST`, `REDIS_PORT`, or `REDIS_URL` are correct and the instance is reachable.
+
+- **IdP callback failures**: Verify that `IDP_REDIRECT_URI` matches the callback URL allow-listed in your IdP configuration.
+
+- **Qlik session not loading**: Ensure `TENANT_URI`, `WEB_INTEGRATION_ID`, and the JWT keys are correct. Check that your Qlik JWT identity provider is properly configured in Qlik Cloud.
+
+- **403 / CSRF token errors**: The app requires CSRF tokens from Qlik. If errors persist, verify that the Qlik session is being stored and retrieved correctly from Redis.
