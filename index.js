@@ -179,8 +179,10 @@ app.get('/single/*', async (req, res) => {
 app.get('/api/v1/*', async (req, res) => {
   try {
     const qlikCookie = getQlikCookieFromSession(req.session);
-    // Some Qlik API endpoints are public and some need the Qlik session. Forward
-    // the cookie only when the user has completed the login flow.
+    // Some Qlik API endpoints are public while others require a Qlik session.
+    // Forward the stored Qlik session cookie when it exists. If no session
+    // exists, forward the request without a cookie and let Qlik Cloud return the
+    // appropriate public response or authorization error.
     const upstream = await fetch(`https://${qlikConfig.tenantUri}${req.originalUrl}`, {
       headers: qlikCookie ? { cookie: qlikCookie } : {},
     });
@@ -375,7 +377,7 @@ async function getQlikCookieFromSocket(req) {
 
   // Websocket upgrades bypass Express middleware, so the signed session cookie
   // must be verified manually before loading the matching Redis session.
-  const sessionId = cookieParser.signedCookie(appCookie, env.sessionSecret);
+  const sessionId = cookieParser.signedCookie(appCookie, env.SESSION_SECRET);
   if (!sessionId) {
     return '';
   }
