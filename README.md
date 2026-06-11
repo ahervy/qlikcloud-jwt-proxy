@@ -57,7 +57,7 @@ Copy `.env.example` to `.env`, then set these values before running the sample:
 | Local App | `APP_BASE_URL` | Public URL of this proxy (usually `http://localhost:3000` for local development) |
 | Redis | `REDIS_HOST`, `REDIS_PORT` or `REDIS_URL` | Session storage (see [Redis Configuration](#redis-configuration)) |
 | Cookies | `COOKIE_SECURE` | Set to `true` if using HTTPS |
-| Demo Content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_THEME` | Qlik app and sheet IDs to display in the sample (optional) |
+| Demo Content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_EMBED_APP_ID`, `QLIK_EMBED_OBJECT_ID`, `QLIK_THEME` | Qlik app, sheet, and object IDs to display in the sample (optional) |
 
 ### Redis Configuration
 
@@ -104,7 +104,7 @@ Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local deve
 QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-- **Demo content**: The sample displays Qlik content using environment variables. The `qlik-embed` example in `index.html` is simpler: edit the `app-id` and `object-id` attributes directly in the HTML file instead of using environment variables.
+- **Demo content**: The backend exposes demo content values to the browser through `/app-config.js`. Set the Qlik app, sheet, and object IDs in your `.env` file (see [Required Environment Variables](#required-environment-variables)), and they will be automatically available to both the quickstart and the `qlik-embed` examples.
 
 ## Scripts
 

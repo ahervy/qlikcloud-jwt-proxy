@@ -84,6 +84,8 @@ app.get('/app-config.js', (req, res) => {
     iframeAppId: env.IFRAME_APP_ID || env.APP_ID || '<APP_ID>',
     iframeSheetId: env.IFRAME_SHEET_ID || '<SHEET_ID>',
     theme: env.QLIK_THEME || 'breeze',
+    qlikEmbedAppId: env.QLIK_EMBED_APP_ID || env.APP_ID || '<APP_ID>',
+    qlikEmbedObjectId: env.QLIK_EMBED_OBJECT_ID || '<OBJECT_ID>',
   })};`);
 });
 
