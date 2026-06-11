@@ -15,7 +15,7 @@ Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cook
   - Client ID and client secret
   - Authorization endpoint: `{IDP_URI}/authorize`
   - Token endpoint: `{IDP_URI}/oauth/token`
-  - Callback URL set to `http://localhost:3000/oauth-callback.html` (adjust for your setup)
+  - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
 - Redis running locally or access to a Redis-compatible instance
 
 ### Setup
@@ -92,7 +92,7 @@ This sample constructs IdP endpoints using the `IDP_URI` base URL:
 
 This pattern matches Auth0 and similar OAuth2 providers. **If your IdP uses different endpoint paths, you must modify `index.js`** to construct the correct URLs (see lines 39–40).
 
-Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/oauth-callback.html`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
+Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/login/callback`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
 
 ### Other Configuration Notes
 
@@ -122,7 +122,9 @@ npm run check      # Run linting and type checks
 
 - **IdP integration**: The app uses PKCE (Proof Key for Code Exchange) to securely exchange an authorization code for an IdP token, then uses that token to identify the user. A Qlik JWT is created from the user's IdP claims and exchanged for a Qlik session cookie.
 
-- **Proxying**: The app proxies Qlik API requests (`/api/v1/*`), Single API content (`/single/*`), static assets (`/resources/*`, `/assets/*`), and websocket connections (`/app/*`) through the same origin, maintaining session context.
+- **Proxying**: The app proxies Qlik API requests (`/api/v1/*`), Single API content (`/single/*`), static assets (`/resources/*`, `/assets/*`), and websocket connections (`/app/*`) through the same origin. For `/single/*` and `/app/*`, the proxy requires a Qlik session. For `/api/v1/*`, the proxy forwards the stored Qlik session cookie when one exists; otherwise, it forwards the request without a cookie and lets Qlik Cloud return the appropriate public response or authorization error.
+
+- **GET-only sample**: The sample proxies `GET` requests only. Support for other HTTP methods, such as `POST`, `PUT`, or `DELETE`, is outside the scope of this tutorial.
 
 ## Troubleshooting
 
