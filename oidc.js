@@ -1,6 +1,6 @@
 import { Issuer } from 'openid-client';
 
-// Discover the IdP's authorization endpoint, token endpoint, and signing keys.
+// Discover the IdP's standard OIDC endpoints and the location of its signing keys.
 // This avoids relying on provider-specific endpoint URLs.
 export async function createIdpClient(config) {
   const issuer = await Issuer.discover(config.idpUri);
@@ -34,7 +34,6 @@ export function takeLoginState(session, returnedState) {
     return null;
   }
 
-  // Accept the callback only once, and only in the session that initiated it.
   delete session.pendingLogin;
   return { codeVerifier: pendingLogin.codeVerifier, nonce: pendingLogin.nonce };
 }

@@ -33,6 +33,9 @@ let server;
 let tokenOverrides = {};
 let signingKey = privateKey;
 
+// Start a small local OIDC provider for testing.
+// It exposes discovery metadata, a JWKS endpoint, and a token endpoint
+// that returns signed ID tokens. No external IdP or Qlik tenant is needed.
 before(async () => {
   server = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -108,6 +111,7 @@ test('accepts a signed ID token with valid issuer, audience, expiry, and nonce',
   assert.equal(claims.sub, 'user-123');
 });
 
+// Change one claim at a time to verify that invalid ID tokens are rejected.
 for (const [name, overrides] of [
   ['wrong issuer', { iss: 'https://wrong-issuer.example' }],
   ['wrong audience', { aud: 'different-client' }],
