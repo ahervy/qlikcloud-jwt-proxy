@@ -2,11 +2,21 @@
 
 Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cookie proxy pattern. This app authenticates a user through an identity provider (IdP), creates a signed JWT for Qlik Cloud, stores the Qlik session cookie server-side, and proxies Qlik Cloud resources, REST API calls, Single API iframe content, and engine websockets from the same origin.
 
-For new production embedded analytics projects, evaluate Qlik OAuth machine-to-machine impersonation first. Keep this JWT session cookie proxy pattern for cases where OAuth impersonation cannot be used and you specifically need the session-cookie proxy architecture.
+**This is a tutorial sample, not production-ready authentication infrastructure.** It intentionally simplifies IdP token validation and session management for educational purposes. For production use, implement proper token validation, issuer/audience checks, expiry validation, nonce handling, and other security hardening.
 
 **This is a tutorial sample, not production-ready authentication infrastructure.** It validates IdP tokens through OpenID Connect discovery, including signature, issuer, audience, expiry, and nonce checks. Temporary OIDC login state is bound to the browser's Redis-backed Express session and consumed once at the callback. Production applications still need deployment-specific security hardening.
 
-## Run Locally
+- Node.js 18 or newer
+- Qlik Cloud tenant with JWT identity provider configuration (get the tenant URI, key ID, and private key from your Qlik admin)
+- Web integration ID from Qlik Cloud
+- Identity provider (IdP) set up as an OAuth2 application with:
+  - Client ID and client secret
+  - Authorization endpoint: `{IDP_URI}/authorize`
+  - Token endpoint: `{IDP_URI}/oauth/token`
+  - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
+- Redis running locally or access to a Redis-compatible instance
+
+### Setup
 
 ### Prerequisites
 
