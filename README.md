@@ -4,9 +4,7 @@ Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cook
 
 **This is a tutorial sample, not production-ready authentication infrastructure.** It intentionally simplifies IdP token validation and session management for educational purposes. For production use, implement proper token validation, issuer/audience checks, expiry validation, nonce handling, and other security hardening.
 
-## Run Locally
-
-### Prerequisites
+**This is a tutorial sample, not production-ready authentication infrastructure.** It validates IdP tokens through OpenID Connect discovery, including signature, issuer, audience, expiry, and nonce checks. Temporary OIDC login state is bound to the browser's Redis-backed Express session and consumed once at the callback. Production applications still need deployment-specific security hardening.
 
 - Node.js 18 or newer
 - Qlik Cloud tenant with JWT identity provider configuration (get the tenant URI, key ID, and private key from your Qlik admin)
@@ -15,6 +13,20 @@ Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cook
   - Client ID and client secret
   - Authorization endpoint: `{IDP_URI}/authorize`
   - Token endpoint: `{IDP_URI}/oauth/token`
+  - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
+- Redis running locally or access to a Redis-compatible instance
+
+### Setup
+
+### Prerequisites
+
+- Node.js 22 or 24 LTS
+- Qlik Cloud tenant with JWT identity provider configuration (get the tenant URI, key ID, and private key from your Qlik admin)
+- Web integration ID from Qlik Cloud
+- OpenID Connect identity provider (IdP), such as Auth0, with:
+  - Client ID and client secret
+  - An issuer URL that supports OpenID Connect discovery and publishes signing keys
+  - Support for the `client_secret_post` token endpoint authentication method
   - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
 - Redis running locally or access to a Redis-compatible instance
 
@@ -52,7 +64,7 @@ Copy `.env.example` to `.env`, then set these values before running the sample:
 | Category | Variables | Purpose |
 | --- | --- | --- |
 | Qlik Cloud | `TENANT_URI`, `WEB_INTEGRATION_ID`, `QLIK_JWT_ISSUER`, `QLIK_JWT_KEY_ID`, `QLIK_JWT_PRIVATE_KEY` | JWT identity provider configuration from Qlik Cloud |
-| Identity Provider | `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`, `IDP_URI`, `IDP_REDIRECT_URI` | OAuth2 configuration for your IdP (e.g., Auth0) |
+| Identity Provider | `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`, `IDP_URI`, `IDP_REDIRECT_URI` | OpenID Connect configuration for your IdP (e.g., Auth0) |
 | Session | `SESSION_SECRET`, `SESSION_MAX_AGE_MS` | Session management |
 | Local App | `APP_BASE_URL` | Public URL of this proxy (usually `http://localhost:3000` for local development) |
 | Redis | `REDIS_HOST`, `REDIS_PORT` or `REDIS_URL` | Session storage (see [Redis Configuration](#redis-configuration)) |
@@ -73,7 +85,7 @@ docker compose up -d redis
 
 **Option 2: Hosted Redis**
 
-Set `REDIS_URL` in `.env` (e.g., `******host:port`). Leave `REDIS_HOST` and `REDIS_PORT` commented out:
+Set `REDIS_URL` in `.env` (for example, `redis://localhost:6379`). This takes precedence over `REDIS_HOST` and `REDIS_PORT`:
 
 ```env
 REDIS_URL=redis://localhost:6379
@@ -85,24 +97,23 @@ The app supports `REDIS_PASSWORD` if your Redis instance requires authentication
 
 ### Identity Provider (IdP) Configuration
 
-This sample constructs IdP endpoints using the `IDP_URI` base URL:
+Set `IDP_URI` to your provider's OpenID Connect issuer URL, for example `https://your-tenant.eu.auth0.com`. The app retrieves the authorize endpoint, token endpoint, and public signing keys through OpenID Connect discovery when it starts. It uses `openid-client` to validate the ID token before reading its user claims.
 
-- **Authorization endpoint**: `{IDP_URI}/authorize`
-- **Token endpoint**: `{IDP_URI}/oauth/token`
-
-This pattern matches Auth0 and similar OAuth2 providers. **If your IdP uses different endpoint paths, you must modify `index.js`** to construct the correct URLs (see lines 39–40).
+The sample uses `client_secret_post` for the token exchange. Providers that require a different client authentication method may need a change to the client configuration in `index.js`. Keep `openid` in `IDP_SCOPE`, and request the `email` and `profile` scopes so the sample receives the required user claims.
 
 Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/login/callback`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
 
 ### Other Configuration Notes
 
-- **`APP_BASE_URL`**: The public URL of this proxy. For local development, it defaults to `http://localhost:3000`. If you expose the app via a tunnel or reverse proxy, set this to that URL and update your IdP callback configuration.
+- **`APP_BASE_URL`**: The public URL of this proxy. For local development, it defaults to `http://localhost:3000`. If you expose the app via a tunnel or reverse proxy, set this to that URL and update your IdP callback configuration. An HTTPS-terminating reverse proxy also requires an appropriate Express `trust proxy` configuration before secure session cookies will work.
 
-- **`privateKey`**: Store the Qlik JWT private key with escaped newlines:
+- **`QLIK_JWT_PRIVATE_KEY`**: Store the Qlik JWT private key with escaped newlines:
 
 ```env
 QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
+
+- **`SESSION_SECRET`**: Generate a random value with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
 - **Demo content**: The backend exposes demo content values to the browser through `/app-config.js`. Set the Qlik app, sheet, and object IDs in your `.env` file (see [Required Environment Variables](#required-environment-variables)), and they will be automatically available to both the quickstart and the `qlik-embed` examples.
 
@@ -110,8 +121,9 @@ QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 
 ```sh
 npm start          # Run the app
-npm run dev        # Run with auto-reload (requires a dev tool configured)
-npm run check      # Run linting and type checks
+npm run dev        # Run with Node.js watch mode
+npm run check      # Check backend JavaScript syntax
+npm test           # Validate ID token verification with a local mock IdP
 ```
 
 ## How It Works
@@ -120,7 +132,7 @@ npm run check      # Run linting and type checks
 
 - **Redis for multi-instance deployment**: In development, you can use local Redis. For production deployments with multiple app instances, use a managed Redis service so all instances share the same session store.
 
-- **IdP integration**: The app uses PKCE (Proof Key for Code Exchange) to securely exchange an authorization code for an IdP token, then uses that token to identify the user. A Qlik JWT is created from the user's IdP claims and exchanged for a Qlik session cookie.
+- **IdP integration**: The app uses PKCE (Proof Key for Code Exchange) and a nonce during login. The pending login details are held in the browser's server-side session and removed on the callback. The IdP token is validated against the provider's signing keys and expected claims before creating a Qlik JWT and exchanging it for a Qlik session cookie.
 
 - **Proxying**: The app proxies Qlik API requests (`/api/v1/*`), Single API content (`/single/*`), static assets (`/resources/*`, `/assets/*`), and websocket connections (`/app/*`) through the same origin. For `/single/*` and `/app/*`, the proxy requires a Qlik session. For `/api/v1/*`, the proxy forwards the stored Qlik session cookie when one exists; otherwise, it forwards the request without a cookie and lets Qlik Cloud return the appropriate public response or authorization error.
 

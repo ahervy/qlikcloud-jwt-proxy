@@ -13,7 +13,13 @@ import jsonwebtoken from 'jsonwebtoken';
 import WebSocket, { WebSocketServer } from 'ws';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { createIdpClient, takeLoginState, validateIdpCallback } from './oidc.js';
 
+// This example authenticates users through an OpenID Connect provider,
+// then exchanges a signed JWT for a Qlik Cloud session cookie.
+//
+// The Qlik session cookie is stored in Redis and never sent to the browser.
+// Embedded content accesses Qlik Cloud through this same-origin proxy.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const env = process.env;
 
@@ -36,15 +42,14 @@ const authConfig = {
   clientId: env.IDP_CLIENT_ID,
   clientSecret: env.IDP_CLIENT_SECRET,
   redirectUri: env.IDP_REDIRECT_URI || `${appBaseUrl}/login/callback`,
-  idpAuthorizeUri: `${removeTrailingSlash(env.IDP_URI || '')}/authorize`,
-  idpTokenUri: `${removeTrailingSlash(env.IDP_URI || '')}/oauth/token`,
+  idpUri: removeTrailingSlash(env.IDP_URI || ''),
 };
 
 validateConfig();
 
-// PKCE verifier stays server-side and is released only after the callback proves
-// it owns the matching state value from the authorization redirect.
-const tokenStore = {};
+// Discovery provides the IdP endpoints and signing keys used by openid-client
+// to validate the ID token's signature, issuer, audience, expiry, and nonce.
+const idpClient = await createIdpClient(authConfig);
 
 // Session Storage
 const redisClient = createClient(buildRedisOptions());
@@ -96,21 +101,26 @@ app.get('/session', (req, res) => {
 });
 
 // Authentication Routes
-app.get('/login', (req, res) => startLogin(res, 'none'));
+// Login starts with a silent SSO attempt (prompt=none).
+// If the IdP requires user interaction, the callback starts a second
+// authorization request without prompt=none to display the login page.
+app.get('/login', (req, res) => startLogin(req, res, 'none'));
 
 app.get('/login/callback', async (req, res) => {
   try {
     const { code, error, state } = req.query;
-
-    if (error) {
-      // prompt=none is a silent SSO probe; IdP errors fall back to interactive
-      // login while keeping the same PKCE/state protection.
-      startLogin(res);
+    // Pending OIDC parameters belong to the browser session that started login.
+    // Consume them once, whether the IdP returns a code or an error.
+    const loginState = takeLoginState(req.session, state);
+    if (!loginState) {
+      res.status(401).send('Invalid or expired login state.');
       return;
     }
 
-    if (!state || !tokenStore[state]) {
-      res.status(401).send('Invalid or expired login state.');
+    if (error) {
+      // prompt=none is a silent SSO probe; IdP errors fall back to interactive
+      // login with a new state and PKCE challenge.
+      startLogin(req, res);
       return;
     }
 
@@ -119,26 +129,31 @@ app.get('/login/callback', async (req, res) => {
       return;
     }
 
-    const idpToken = await exchangeAuthorizationCode(code, state, tokenStore[state].codeVerifier);
-    if (!idpToken) {
-      res.status(502).send('The identity provider token exchange failed.');
+    let idToken;
+    try {
+      idToken = await validateIdpCallback(idpClient, authConfig.redirectUri, code, state, loginState);
+    } catch (err) {
+      console.error('IdP token exchange or validation failed:', err.message);
+      res.status(502).send('The identity provider token exchange or validation failed.');
       return;
     }
 
-    const idToken = jsonwebtoken.decode(idpToken.id_token);
     if (!idToken?.email || !idToken?.sub) {
       res.status(502).send('The identity provider did not return the required user claims.');
+      return;
+    }
+
+    if (idToken.email_verified !== true) {
+      res.status(403).send('The identity provider has not verified the email address.');
       return;
     }
 
     const qlikJwt = createQlikJwt(idToken.email, idToken.name || idToken.email, idToken.sub);
     const qlikSession = await exchangeJwtForQlikCookie(qlikJwt);
 
-    // Store both the original IdP token and the Qlik session for this browser
-    // session. Proxied requests use the Qlik cookie, not the IdP token.
-    req.session.idToken = idpToken.id_token;
-    // The Qlik cookie string contains separators that should survive JSON
-    // serialization in Redis until the proxy forwards it upstream.
+    // Store only the Qlik session cookie. The IdP token is no longer needed
+    // after creating the Qlik session and should not be kept in Redis.
+    // Encoding preserves cookie separators through session serialization.
     req.session.qlikSession = encodeURIComponent(qlikSession);
     res.redirect(appBaseUrl);
   } catch (err) {
@@ -174,7 +189,7 @@ app.get('/single/*', async (req, res) => {
     await sendUpstream(res, upstream);
   } catch (err) {
     console.error('Proxy /single failed:', err.message);
-    res.status(502).send('Failed to load content from Qlik Cloud. Check that tenantUri is correct and reachable.');
+    res.status(502).send('Failed to load content from Qlik Cloud. Check that TENANT_URI is correct and reachable.');
   }
 });
 
@@ -193,7 +208,7 @@ app.get('/api/v1/*', async (req, res) => {
     await sendUpstream(res, upstream);
   } catch (err) {
     console.error('Proxy /api/v1 failed:', err.message);
-    res.status(502).send('Failed to reach Qlik Cloud API. Check that tenantUri is correct and reachable.');
+    res.status(502).send('Failed to reach Qlik Cloud API. Check that TENANT_URI is correct and reachable.');
   }
 });
 
@@ -208,11 +223,15 @@ app.options('/*', (req, res) => {
 });
 
 const server = app.listen(port, () => {
+  // URL.host excludes credentials and query parameters from REDIS_URL.
+  const redisEndpoint = env.REDIS_URL
+    ? new URL(env.REDIS_URL).host
+    : `${env.REDIS_HOST || 'localhost'}:${env.REDIS_PORT || 6379}`;
   console.log(`Qlik JWT proxy running at ${appBaseUrl}`);
   console.log(`  Tenant:   ${qlikConfig.tenantUri}`);
-  console.log(`  IdP:      ${authConfig.idpAuthorizeUri}`);
+  console.log(`  IdP:      ${idpClient.issuer.metadata.authorization_endpoint}`);
   console.log(`  Callback: ${authConfig.redirectUri}`);
-  console.log(`  Redis:    ${env.REDIS_URL || `${env.REDIS_HOST || 'localhost'}:${env.REDIS_PORT || 6379}`}`);
+  console.log(`  Redis:    ${redisEndpoint}`);
 });
 
 // Qlik Websocket Proxy
@@ -261,55 +280,27 @@ wss.on('connection', async (ws, req) => {
 });
 
 // Helpers
-function startLogin(res, prompt) {
-  const state = crypto.randomBytes(16).toString('hex');
+function startLogin(req, res, prompt) {
+  const state = generators.state();
   const codeVerifier = generators.codeVerifier(43);
-  // PKCE sends only the derived challenge to the IdP. The verifier is kept in
-  // tokenStore and sent later during the token exchange.
-  const params = new URLSearchParams({
+  const nonce = generators.nonce();
+  // PKCE sends only the derived challenge to the IdP. The verifier and nonce
+  // stay in the browser's server-side session until the callback arrives.
+  const params = {
     response_type: 'code',
-    client_id: authConfig.clientId,
-    redirect_uri: authConfig.redirectUri,
     code_challenge: generators.codeChallenge(codeVerifier),
     code_challenge_method: 'S256',
     scope: idpScope,
     state,
-  });
+    nonce,
+  };
 
   if (prompt) {
-    params.set('prompt', prompt);
+    params.prompt = prompt;
   }
 
-  tokenStore[state] = { codeVerifier };
-  res.redirect(`${authConfig.idpAuthorizeUri}?${params.toString()}`);
-}
-
-async function exchangeAuthorizationCode(code, state, codeVerifier) {
-  // The authorization code is useless without the matching PKCE verifier, which
-  // protects the callback from intercepted or replayed codes.
-  const tokenRequestBody = new URLSearchParams({
-    code,
-    code_verifier: codeVerifier,
-    grant_type: 'authorization_code',
-    redirect_uri: authConfig.redirectUri,
-    client_id: authConfig.clientId,
-    client_secret: authConfig.clientSecret,
-  });
-
-  const idpTokenRes = await fetch(authConfig.idpTokenUri, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: tokenRequestBody,
-  });
-
-  delete tokenStore[state];
-
-  if (!idpTokenRes.ok) {
-    console.error(await idpTokenRes.text());
-    return null;
-  }
-
-  return idpTokenRes.json();
+  req.session.pendingLogin = { state, codeVerifier, nonce };
+  res.redirect(idpClient.authorizationUrl(params));
 }
 
 function createQlikJwt(email, name, sub) {
@@ -468,15 +459,15 @@ function parseBoolean(value, fallback) {
 
 function validateConfig() {
   const missing = Object.entries({
-    tenantUri: qlikConfig.tenantUri,
-    privateKey: qlikConfig.privateKey,
-    keyId: qlikConfig.keyId,
-    issuer: qlikConfig.issuer,
-    webIntegrationId: qlikWebId,
-    sessionSecret: env.SESSION_SECRET,
-    clientId: authConfig.clientId,
-    clientSecret: authConfig.clientSecret,
-    idpUri: env.IDP_URI,
+    TENANT_URI: qlikConfig.tenantUri,
+    QLIK_JWT_PRIVATE_KEY: qlikConfig.privateKey,
+    QLIK_JWT_KEY_ID: qlikConfig.keyId,
+    QLIK_JWT_ISSUER: qlikConfig.issuer,
+    WEB_INTEGRATION_ID: qlikWebId,
+    SESSION_SECRET: env.SESSION_SECRET,
+    IDP_CLIENT_ID: authConfig.clientId,
+    IDP_CLIENT_SECRET: authConfig.clientSecret,
+    IDP_URI: env.IDP_URI,
   }).filter(([, value]) => !value).map(([key]) => key);
 
   if (missing.length) {
