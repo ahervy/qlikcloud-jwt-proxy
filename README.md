@@ -2,21 +2,9 @@
 
 Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cookie proxy pattern. This app authenticates a user through an identity provider (IdP), creates a signed JWT for Qlik Cloud, stores the Qlik session cookie server-side, and proxies Qlik Cloud resources, REST API calls, Single API iframe content, and engine websockets from the same origin.
 
-**This is a tutorial sample, not production-ready authentication infrastructure.** It intentionally simplifies IdP token validation and session management for educational purposes. For production use, implement proper token validation, issuer/audience checks, expiry validation, nonce handling, and other security hardening.
-
 **This is a tutorial sample, not production-ready authentication infrastructure.** It validates IdP tokens through OpenID Connect discovery, including signature, issuer, audience, expiry, and nonce checks. Temporary OIDC login state is bound to the browser's Redis-backed Express session and consumed once at the callback. Production applications still need deployment-specific security hardening.
 
-- Node.js 18 or newer
-- Qlik Cloud tenant with JWT identity provider configuration (get the tenant URI, key ID, and private key from your Qlik admin)
-- Web integration ID from Qlik Cloud
-- Identity provider (IdP) set up as an OAuth2 application with:
-  - Client ID and client secret
-  - Authorization endpoint: `{IDP_URI}/authorize`
-  - Token endpoint: `{IDP_URI}/oauth/token`
-  - Callback URL set to `http://localhost:3000/login/callback` (adjust for your setup)
-- Redis running locally or access to a Redis-compatible instance
-
-### Setup
+## Run Locally
 
 ### Prerequisites
 
@@ -39,7 +27,11 @@ Local Node/Express tutorial sample demonstrating the Qlik Cloud JWT session cook
 npm install
 ```
 
-3. Copy `.env.example` to `.env` and fill in all required values (see [Required Environment Variables](#required-environment-variables) below).
+3. Copy `.env.example` to `.env` and fill in the required values (see [Environment Variables](#environment-variables) below):
+
+```sh
+cp .env.example .env
+```
 
 4. Start Redis locally:
 
@@ -57,19 +49,19 @@ npm start
 
 6. Open `http://localhost:3000` in your browser, complete the IdP login, and verify that Qlik content loads.
 
-## Required Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env`, then set these values before running the sample:
+Copy `.env.example` to `.env`, then configure the values for your setup. Variable names are case-sensitive and use uppercase letters with underscores. The Qlik Cloud and IdP credentials, plus `SESSION_SECRET`, are required. The other settings have defaults or are used to configure the embedded examples.
 
 | Category | Variables | Purpose |
 | --- | --- | --- |
 | Qlik Cloud | `TENANT_URI`, `WEB_INTEGRATION_ID`, `QLIK_JWT_ISSUER`, `QLIK_JWT_KEY_ID`, `QLIK_JWT_PRIVATE_KEY` | JWT identity provider configuration from Qlik Cloud |
-| Identity Provider | `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`, `IDP_URI`, `IDP_REDIRECT_URI` | OpenID Connect configuration for your IdP (e.g., Auth0) |
+| Identity Provider | `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`, `IDP_URI`, `IDP_REDIRECT_URI`, `IDP_SCOPE` | OpenID Connect configuration for your IdP (e.g., Auth0). The redirect URI and scope have defaults. |
 | Session | `SESSION_SECRET`, `SESSION_MAX_AGE_MS` | Session management |
-| Local App | `APP_BASE_URL` | Public URL of this proxy (usually `http://localhost:3000` for local development) |
-| Redis | `REDIS_HOST`, `REDIS_PORT` or `REDIS_URL` | Session storage (see [Redis Configuration](#redis-configuration)) |
+| Local App | `PORT`, `APP_BASE_URL` | Local port (default `3000`) and public URL of this proxy (usually `http://localhost:3000`) |
+| Redis | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, or `REDIS_URL` | Session storage (see [Redis Configuration](#redis-configuration)) |
 | Cookies | `COOKIE_SECURE` | Set to `true` if using HTTPS |
-| Demo Content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_EMBED_APP_ID`, `QLIK_EMBED_OBJECT_ID`, `QLIK_THEME` | Qlik app, sheet, and object IDs to display in the sample (optional) |
+| Demo Content | `APP_ID`, `SHEET_ID`, `IFRAME_APP_ID`, `IFRAME_SHEET_ID`, `QLIK_EMBED_APP_ID`, `QLIK_EMBED_OBJECT_ID`, `QLIK_THEME` | Qlik app, sheet, and object IDs. Needed to display the corresponding examples, but not to start the server. |
 
 ### Redis Configuration
 
@@ -99,7 +91,7 @@ The app supports `REDIS_PASSWORD` if your Redis instance requires authentication
 
 Set `IDP_URI` to your provider's OpenID Connect issuer URL, for example `https://your-tenant.eu.auth0.com`. The app retrieves the authorize endpoint, token endpoint, and public signing keys through OpenID Connect discovery when it starts. It uses `openid-client` to validate the ID token before reading its user claims.
 
-The sample uses `client_secret_post` for the token exchange. Providers that require a different client authentication method may need a change to the client configuration in `index.js`. Keep `openid` in `IDP_SCOPE`, and request the `email` and `profile` scopes so the sample receives the required user claims.
+The sample uses `client_secret_post` for the token exchange. Providers that require a different client authentication method may need a change to the client configuration in `index.js`. Keep `openid` in `IDP_SCOPE`, and request the `email` and `profile` scopes so the sample receives the required user claims. The IdP must return `email_verified: true` for the login to proceed.
 
 Set `IDP_REDIRECT_URI` to match your IdP's allowed callback URLs. For local development, use `http://localhost:3000/login/callback`. If you use a tunnel or reverse proxy, update this to the public URL and reconfigure your IdP.
 
@@ -115,7 +107,7 @@ QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 
 - **`SESSION_SECRET`**: Generate a random value with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
-- **Demo content**: The backend exposes demo content values to the browser through `/app-config.js`. Set the Qlik app, sheet, and object IDs in your `.env` file (see [Required Environment Variables](#required-environment-variables)), and they will be automatically available to both the quickstart and the `qlik-embed` examples.
+- **Demo content**: The backend exposes demo content values to the browser through `/app-config.js`. Set the Qlik app, sheet, and object IDs in your `.env` file (see [Environment Variables](#environment-variables)), and they will be available to the embedding examples.
 
 ## Scripts
 
@@ -123,7 +115,7 @@ QLIK_JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 npm start          # Run the app
 npm run dev        # Run with Node.js watch mode
 npm run check      # Check backend JavaScript syntax
-npm test           # Validate ID token verification with a local mock IdP
+npm test           # Test OIDC validation and login-state handling
 ```
 
 ## How It Works
